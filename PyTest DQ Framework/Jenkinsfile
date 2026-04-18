@@ -33,7 +33,7 @@ pipeline {
                . venv/bin/activate
 
                pip install --upgrade pip
-               pip install -r requirements.txt
+               pip install -r "PyTest DQ Framework/requirements.txt"
                '''
            }
        }
@@ -43,23 +43,23 @@ pipeline {
                sh '''
                . venv/bin/activate
 
-               pytest tests -s -m parquet_data \
+               pytest "PyTest DQ Framework/tests" -s -m parquet_data \
                  --db_host=$DB_HOST \
                  --db_port=$DB_PORT \
                  --db_name=$DB_NAME \
                  --db_user=$POSTGRES_SECRET_USR \
                  --db_password=$POSTGRES_SECRET_PSW \
-                 --html=html_report/report.html \
+                 --html="PyTest DQ Framework/html_report/report.html" \
                  --self-contained-html \
-                 --junitxml=report.xml
+                 --junitxml="PyTest DQ Framework/report.xml"
                '''
            }
        }
 
        stage('Archive') {
            steps {
-               archiveArtifacts artifacts: 'html_report/**'
-               junit 'report.xml'
+               archiveArtifacts artifacts: 'PyTest DQ Framework/html_report/**'
+               junit 'PyTest DQ Framework/report.xml'
            }
        }
    }
