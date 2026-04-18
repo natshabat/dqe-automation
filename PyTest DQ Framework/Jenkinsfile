@@ -1,0 +1,48 @@
+pipeline {
+   agent any
+   environment {
+       POSTGRES_SECRET = credentials('postgres-secret')
+       POSTGRES_USER = "${POSTGRES_SECRET_USR}"
+       POSTGRES_PASSWORD = "${POSTGRES_SECRET_PSW}"
+   }
+   stages {
+       stage('Checkout') {
+           steps {
+               checkout scm
+           }
+       }
+       stage('Install dependencies') {
+           steps {
+               bat '''
+               python -m pip install --upgrade pip
+               pip install -r requirements.txt
+               '''
+           }
+       }
+       stage('Run tests') {
+           steps {
+               bat '''
+               pytest tests -s -m parquet_data^
+                 --db_host=localhost ^
+                 --db_port=5434 ^
+                 --db_name=mydatabase ^
+                 --db_user=%POSTGRES_USER% ^
+                 --db_password=%POSTGRES_PASSWORD% ^
+                 --html=html_report/report.html --self-contained-html
+               '''
+           }
+       }
+       stage('Archive Test Report') {
+           steps {
+               archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
+               publishHTML(target: [
+                   allowMissing: false,
+                   keepAll: true,
+                   reportDir: 'html_report',
+                   reportFiles: 'report.html',
+                   reportName: 'PyTest Report_DQ-Framework'
+               ])
+           }
+       }
+   }
+}
