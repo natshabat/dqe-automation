@@ -17,61 +17,50 @@ pipeline {
            }
        }
 
-       stage('Verify environment') {
+       stage('Verify') {
            steps {
                sh '''
-               python3 --version || true
-               pip3 --version || true
-               whoami
+               python3 --version
+               pip3 --version
                '''
            }
        }
 
        stage('Install dependencies') {
-            steps {
-                sh '''
-                
-                apt-get update
-                apt-get install -y python3.13-venv gcc libpq-dev
-                
-                python3 -m venv venv
-                . venv/bin/activate
-
-                pip install --upgrade pip
-                pip install -r requirements.txt
-        '''
-    }
-}
-
-        stage('Run tests') {
-            steps {
-                sh '''
-                . venv/bin/activate
-
-                pytest tests -s -m parquet_data \
-                    --db_host=localhost \
-                    --db_port=5434 \
-                    --db_name=mydatabase \
-                    --db_user=$POSTGRES_SECRET_USR \
-                    --db_password=$POSTGRES_SECRET_PSW \
-                    --html=html_report/report.html \
-                    --self-contained-html \
-                    --junitxml=report.xml
-        '''
-    }
-}
-
-       stage('Archive reports') {
            steps {
-               archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
-               junit 'report.xml'
+               sh '''
+               python3 -m venv venv
+               . venv/bin/activate
+
+               pip install --upgrade pip
+               pip install -r requirements.txt
+               '''
            }
        }
-   }
 
-   post {
-       always {
-           echo "Pipeline finished"
+       stage('Run tests') {
+           steps {
+               sh '''
+               . venv/bin/activate
+
+               pytest tests -s -m parquet_data \
+                 --db_host=$DB_HOST \
+                 --db_port=$DB_PORT \
+                 --db_name=$DB_NAME \
+                 --db_user=$POSTGRES_SECRET_USR \
+                 --db_password=$POSTGRES_SECRET_PSW \
+                 --html=html_report/report.html \
+                 --self-contained-html \
+                 --junitxml=report.xml
+               '''
+           }
+       }
+
+       stage('Archive') {
+           steps {
+               archiveArtifacts artifacts: 'html_report/**'
+               junit 'report.xml'
+           }
        }
    }
 }
