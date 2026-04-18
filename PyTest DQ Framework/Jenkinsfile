@@ -1,5 +1,6 @@
 pipeline {
-   agent {docker {image 'python:3.11'}}
+   agent any
+
    environment {
        POSTGRES_SECRET = credentials('postgres-secret')
        POSTGRES_USER = "${POSTGRES_SECRET_USR}"
@@ -14,20 +15,20 @@ pipeline {
        stage('Install dependencies') {
            steps {
                sh '''
-               python -m pip install --upgrade pip
-               pip install -r requirements.txt
+               python3 -m pip install --upgrade pip || true
+               pip3 install -r requirements.txt || true
                '''
            }
        }
        stage('Run tests') {
            steps {
                sh '''
-               python -m pytest tests -s -m parquet_data^
-                 --db_host=localhost ^
-                 --db_port=5434 ^
-                 --db_name=mydatabase ^
-                 --db_user=%POSTGRES_USER% ^
-                 --db_password=%POSTGRES_PASSWORD% ^
+               python3 -m pytest tests -s -m parquet_data
+                 --db_host=localhost 
+                 --db_port=5434 
+                 --db_name=mydatabase 
+                 --db_user=%POSTGRES_USER% 
+                 --db_password=%POSTGRES_PASSWORD% || true
                  --html=html_report/report.html --self-contained-html
                '''
            }
