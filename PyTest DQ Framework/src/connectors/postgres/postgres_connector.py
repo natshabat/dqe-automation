@@ -1,7 +1,7 @@
 
-from turtle import pd
-import psycopg2
 import pandas as pd
+import psycopg2
+
 
 class PostgresConnectorContextManager:
     def __init__(self, db_user, db_password, db_host, db_name, db_port):
