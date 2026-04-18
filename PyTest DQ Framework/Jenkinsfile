@@ -3,10 +3,7 @@ pipeline {
 
    environment {
        POSTGRES_SECRET = credentials('postgres-secret')
-       DB_HOST = 'localhost'
-       DB_PORT = '5434'
-       DB_NAME = 'mydatabase'
-       PYTHONPATH = "${WORKSPACE}"
+       PROJECT_DIR = "PyTest DQ Framework"
    }
 
    stages {
@@ -29,6 +26,7 @@ pipeline {
        stage('Install dependencies') {
            steps {
                sh '''
+               cd "$PROJECT_DIR"
                python3 -m venv venv
                . venv/bin/activate
 
@@ -41,17 +39,18 @@ pipeline {
        stage('Run tests') {
            steps {
                sh '''
+               cd "$PROJECT_DIR"
                . venv/bin/activate
 
-               pytest "PyTest DQ Framework/tests" -s -m parquet_data \
-                 --db_host=$DB_HOST \
-                 --db_port=$DB_PORT \
-                 --db_name=$DB_NAME \
-                 --db_user=$POSTGRES_SECRET_USR \
-                 --db_password=$POSTGRES_SECRET_PSW \
-                 --html="PyTest DQ Framework/html_report/report.html" \
-                 --self-contained-html \
-                 --junitxml="PyTest DQ Framework/report.xml"
+               pytest tests -s -m parquet_data \
+                  --db_host=host.docker.internal \
+                  --db_port=5434 \
+                  --db_name=mydatabase \
+                  --db_user=$POSTGRES_SECRET_USR \
+                  --db_password=$POSTGRES_SECRET_PSW \
+                  --html=html_report/report.html \
+                  --self-contained-html \
+                  --junitxml=report.xml
                '''
            }
        }
