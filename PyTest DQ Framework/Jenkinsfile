@@ -1,50 +1,33 @@
 pipeline {
-    agent any
-    environment {
-        POSTGRES_SECRET = credentials('postgres-secret')
-    }
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-        stage('Setup venv + Install') {
-            steps {
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
-            }
-        }
-        stage('Run tests') {
-            steps {
-                sh '''
-                    . venv/bin/activate
-                    mkdir -p html_report
-                    pytest tests -s -m parquet_data \
-                      --db_host=localhost \
-                      --db_port=5434 \
-                      --db_name=mydatabase \
-                      --db_user=$POSTGRES_SECRET_USR \
-                      --db_password=$POSTGRES_SECRET_PSW \
-                      --html=html_report/report.html \
-                      --self-contained-html
-                '''
-            }
-        }
-        stage('Archive Report') {
-            steps {
-                archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
-                publishHTML([
-                    reportDir: 'html_report',
-                    reportFiles: 'report.html',
-                    reportName: 'Pytest HTML Report'
-                ])
-            }
-        }
-    }
+   agent any
+   environment {
+       POSTGRES_SECRET = credentials('postgres-secret')
+   }
+   stages {
+       stage('Checkout') {
+           steps {
+               checkout scm
+           }
+       }
+       stage('Run tests') {
+           steps {
+               sh '''
+                   mkdir -p html_report
+                   pytest tests -s -m parquet_data \
+                     --db_host=localhost \
+                     --db_port=5434 \
+                     --db_name=mydatabase \
+                     --db_user=myuser \
+                     --db_password=myuser \
+                     --html=html_report/report.html \
+                     --self-contained-html
+               '''
+           }
+       }
+       stage('Archive') {
+           steps {
+               archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
+           }
+       }
+   }
 }
- 
