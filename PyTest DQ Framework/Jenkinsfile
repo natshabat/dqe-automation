@@ -1,47 +1,90 @@
 pipeline {
-   agent any
-   stages {
-       stage('Checkout') {
-           steps {
-               checkout scm
-           }
-       }
-       stage('Install + Test (safe mode)') {
-           steps {
-               sh '''
-               python3 -m venv venv || true
-               . venv/bin/activate || true
-               pip install --upgrade pip || true
-               pip install -r requirements.txt || true
-               mkdir -p html_report || true
-               pytest tests -s -m parquet_data \
-                 --html=html_report/report.html \
-                 --self-contained-html || true
-               '''
-           }
-       }
-       stage('Archive Report') {
-           steps {
-               archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
-               script {
-                   if (fileExists('html_report/report.html')) {
-                       publishHTML(target: [
-                           allowMissing: false,
-                           keepAll: true,
-                           reportDir: 'html_report',
-                           reportFiles: 'report.html',
-                           reportName: 'PyTest Report'
-                       ])
-                   } else {
-                       echo "No HTML report generated"
-                   }
-               }
-           }
-       }
-   }
-   post {
-       always {
-           echo "Pipeline finished"
-       }
-   }
+
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+
+            steps {
+
+                checkout scm
+
+            }
+
+        }
+
+        stage('Install & Test') {
+
+            steps {
+
+                sh '''
+
+                python3 -m pip install --break-system-packages --upgrade pip || true
+
+                pip3 install --break-system-packages -r requirements.txt || true
+
+                mkdir -p html_report || true
+
+                pytest tests -s -m parquet_data \
+
+                  --html=html_report/report.html \
+
+                  --self-contained-html || true
+
+                '''
+
+            }
+
+        }
+
+        stage('Archive Report') {
+
+            steps {
+
+                archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
+
+                script {
+
+                    if (fileExists('html_report/report.html')) {
+
+                        publishHTML(target: [
+
+                            allowMissing: false,
+
+                            keepAll: true,
+
+                            reportDir: 'html_report',
+
+                            reportFiles: 'report.html',
+
+                            reportName: 'PyTest Report'
+
+                        ])
+
+                    } else {
+
+                        echo "No report generated"
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    post {
+
+        always {
+
+            echo "Pipeline finished"
+
+        }
+
+    }
+
 }
+ 
