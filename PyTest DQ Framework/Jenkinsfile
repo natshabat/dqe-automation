@@ -9,24 +9,33 @@ pipeline {
                checkout scm
            }
        }
+       stage('Debug Info') {
+           steps {
+               sh """
+               podman --version ||echo "Podman not found"
+               python --version ||echo "Python not found"
+               whoami ||echo "Unable to determine user"
+               """
+           }
+       }
        stage('Run tests') {
            steps {
                sh '''
-               podman run --rm \
-                 -v $WORKSPACE:/app \
-                 -w /app \
-                 python:3.11 \
-                 bash -c "
-                   pip install --upgrade pip &&
-                   pip install -r requirements.txt &&
-                   pytest tests -s -m parquet_data \
-                     --db_host=localhost \
-                     --db_port=5434 \
-                     --db_name=mydatabase \
-                     --db_user=$POSTGRES_SECRET_USR \
-                     --db_password=$POSTGRES_SECRET_PSW \
-                     --html=html_report/report.html \
-                     --self-contained-html
+            //    podman run --rm \
+            //      -v $WORKSPACE:/app \
+            //      -w /app \
+            //      python:3.11 \
+            //      bash -c "
+            //        pip install --upgrade pip &&
+            //        pip install -r requirements.txt &&
+            //        pytest tests -s -m parquet_data \
+            //          --db_host=localhost \
+            //          --db_port=5434 \
+            //          --db_name=mydatabase \
+            //          --db_user=$POSTGRES_SECRET_USR \
+            //          --db_password=$POSTGRES_SECRET_PSW \
+            //          --html=html_report/report.html \
+            //          --self-contained-html
                  "
                '''
            }
