@@ -1,90 +1,34 @@
 pipeline {
-
-    agent any
-
-    stages {
-
-        stage('Checkout') {
-
-            steps {
-
-                checkout scm
-
-            }
-
-        }
-
-        stage('Install & Test') {
-
-            steps {
-
-                sh '''
-
-                python3 -m pip install --break-system-packages --upgrade pip || true
-
-                pip3 install --break-system-packages -r requirements.txt || true
-
-                mkdir -p html_report || true
-
-                pytest tests -s -m parquet_data \
-
-                  --html=html_report/report.html \
-
-                  --self-contained-html || true
-
-                '''
-
-            }
-
-        }
-
-        stage('Archive Report') {
-
-            steps {
-
-                archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
-
-                script {
-
-                    if (fileExists('html_report/report.html')) {
-
-                        publishHTML(target: [
-
-                            allowMissing: false,
-
-                            keepAll: true,
-
-                            reportDir: 'html_report',
-
-                            reportFiles: 'report.html',
-
-                            reportName: 'PyTest Report'
-
-                        ])
-
-                    } else {
-
-                        echo "No report generated"
-
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
-
-    post {
-
-        always {
-
-            echo "Pipeline finished"
-
-        }
-
-    }
-
+   agent any
+   environment {
+       POSTGRES_SECRET = credentials('postgres-secret')
+   }
+   stages {
+       stage('Checkout') {
+           steps {
+               checkout scm
+           }
+       }
+       stage('Run tests') {
+           steps {
+               sh '''
+               python3 -m pip install --upgrade pip || true
+               pip3 install -r requirements.txt || true
+               pytest tests -s -m parquet_data \
+                 --db_host=localhost \
+                 --db_port=5434 \
+                 --db_name=mydatabase \
+                 --db_user=$POSTGRES_SECRET_USR \
+                 --db_password=$POSTGRES_SECRET_PSW \
+                 --html=html_report/report.html \
+                 --self-contained-html || true
+               '''
+           }
+       }
+       stage('Archive Test Report') {
+           steps {
+               archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
+           }
+       }
+   }
 }
- 
