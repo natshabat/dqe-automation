@@ -16,8 +16,10 @@ pipeline {
                  -v $WORKSPACE:/app \
                  -w /app \
                  python:3.11 bash -c "
-                   pip install --upgrade pip &&
-                   pip install -r requirements.txt &&
+                   set -e
+                   pip install --upgrade pip
+                   pip install -r requirements.txt
+                   mkdir -p html_report
                    pytest tests -s -m parquet_data \
                      --db_host=localhost \
                      --db_port=5434 \
@@ -30,17 +32,28 @@ pipeline {
                '''
            }
        }
-       stage('Archive Test Report') {
+       stage('Archive Report') {
            steps {
                archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
-               publishHTML(target: [
-                   allowMissing: false,
-                   keepAll: true,
-                   reportDir: 'html_report',
-                   reportFiles: 'report.html',
-                   reportName: 'PyTest Report - DQ Framework'
-               ])
+               script {
+                   if (fileExists('html_report/report.html')) {
+                       publishHTML(target: [
+                           allowMissing: false,
+                           keepAll: true,
+                           reportDir: 'html_report',
+                           reportFiles: 'report.html',
+                           reportName: 'PyTest HTML Report'
+                       ])
+                   } else {
+                       echo "HTML report not found - skipping publishHTML"
+                   }
+               }
            }
+       }
+   }
+   post {
+       always {
+           echo "Pipeline finished"
        }
    }
 }
