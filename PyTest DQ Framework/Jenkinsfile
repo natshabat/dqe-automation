@@ -1,14 +1,9 @@
 pipeline {
-   agent {
-       docker {
-           image 'python:3.11-slim'
-           args '-u root'
-       }
-   }
+   agent any
 
    environment {
        POSTGRES_SECRET = credentials('postgres-secret')
-       DB_HOST = 'host.docker.internal'   // критично!
+       DB_HOST = 'localhost'
        DB_PORT = '5434'
        DB_NAME = 'mydatabase'
        PYTHONPATH = "${WORKSPACE}"
@@ -22,15 +17,28 @@ pipeline {
            }
        }
 
+       stage('Verify environment') {
+           steps {
+               sh '''
+               python3 --version || true
+               pip3 --version || true
+               whoami
+               '''
+           }
+       }
+
+       stage('Install dependencies') {
+           steps {
+               sh '''
+               python3 -m pip install --upgrade pip
+               pip3 install -r requirements.txt
+               '''
+           }
+       }
+
        stage('Run tests') {
            steps {
                sh '''
-               apt-get update
-               apt-get install -y gcc libpq-dev
-
-               python -m pip install --upgrade pip
-               pip install -r requirements.txt
-
                pytest tests -s -m parquet_data \
                  --db_host=$DB_HOST \
                  --db_port=$DB_PORT \
@@ -44,7 +52,7 @@ pipeline {
            }
        }
 
-       stage('Archive Test Report') {
+       stage('Archive reports') {
            steps {
                archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
                junit 'report.xml'
@@ -54,10 +62,7 @@ pipeline {
 
    post {
        always {
-           echo 'Pipeline finished'
-       }
-       failure {
-           echo 'Pipeline failed'
+           echo "Pipeline finished"
        }
    }
 }
