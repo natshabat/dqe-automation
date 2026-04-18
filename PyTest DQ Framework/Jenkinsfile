@@ -3,8 +3,6 @@ pipeline {
 
    environment {
        POSTGRES_SECRET = credentials('postgres-secret')
-       POSTGRES_USER = "${POSTGRES_SECRET_USR}"
-       POSTGRES_PASSWORD = "${POSTGRES_SECRET_PSW}"
    }
    stages {
        stage('Checkout') {
@@ -23,13 +21,13 @@ pipeline {
        stage('Run tests') {
            steps {
                sh '''
-               python3 -m pytest tests -s -m parquet_data
-                 --db_host=localhost 
-                 --db_port=5434 
-                 --db_name=mydatabase 
-                 --db_user=%POSTGRES_USER% 
-                 --db_password=%POSTGRES_PASSWORD% || true
-                 --html=html_report/report.html --self-contained-html
+               python3 -m pytest tests -s -m parquet_data \
+                 --db_host=localhost \
+                 --db_port=5434 \
+                 --db_name=mydatabase \
+                 --db_user=$POSTGRES_SECRET_USR \
+                 --db_password=$POSTGRES_SECRET_PSW || true
+                 --html=html_report/report.html --self-contained-html || true
                '''
            }
        }
