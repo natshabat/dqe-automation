@@ -1,0 +1,17 @@
+Result,Test,Duration,Links
+Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_dataset_is_not_empty,345 ms,
+"<
+>
+No log output captured."
+Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_check_count,81 ms,
+"<
+>
+No log output captured."
+Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_check_not_null_values,1 ms,
+"<
+>
+No log output captured."
+Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_check_duplicates,2 ms,
+"<
+>
+No log output captured."
