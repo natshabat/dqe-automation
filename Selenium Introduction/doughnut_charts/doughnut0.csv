@@ -1,2 +1,4 @@
-Result,Min Duration (ms)
-Passed,1
+Facility Type,Min Average Time Spent
+Hospital,25.5
+Specialty Center,25.5
+Clinic,19

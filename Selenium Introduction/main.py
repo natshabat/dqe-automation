@@ -38,68 +38,96 @@ class SeleniumWebDriverContextManager:
             self.driver.quit()
 
 def extract_table(driver: WebDriver, output_path: str):
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 15)
 
     try:
-        table = wait.until(
-            EC.presence_of_element_located((By.ID, "results-table"))
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "g.table")))
+
+        wait.until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, "g.y-column")) > 0)
+        wait.until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, "g.column-cell text.cell-text")) > 0)
+        import time
+
+        time.sleep(1.5)  # stabilize SVG rendering (important for D3/Plotly)
+
+        header_elements = driver.find_elements(
+            By.CSS_SELECTOR,
+            "g.y-column g#header text.cell-text"
         )
-        rows = table.find_elements(By.CSS_SELECTOR, "tbody tr")
+        headers = [h.text.strip() for h in header_elements]
 
-        data = []
+        # 4. get all columns
+        columns = driver.find_elements(By.CSS_SELECTOR, "g.y-column")
+
+        # 5. build column data matrix first
+        column_matrix = []
+
+        for col in columns:
+            cells = col.find_elements(
+                By.CSS_SELECTOR,
+                "g.column-cell text.cell-text"
+            )
+
+            col_values = []
+            for c in cells:
+                txt = c.text.strip()
+                if txt:
+                    col_values.append(txt)
+
+            column_matrix.append(col_values)
+        max_len = max(len(col) for col in column_matrix)
+
+        for col in column_matrix:
+            col.extend([""] * (max_len - len(col)))
+        rows = list(zip(*column_matrix))
+
+        clean_rows = []
+        header_set = set(headers)
+
         for row in rows:
-            cols = row.find_elements(By.XPATH, ".//td")
-            if cols:
-                row_data = [col.text.strip() for col in cols]
-                data.append(row_data)
-        
-        if not data:
-            print("No data found in the table.")
-            return
-        
-    
-        header = ["Result","Test","Duration","Links"]
-        with open(output_path, mode="w", newline="", encoding="utf-8") as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(header)
-            writer.writerows(data)
-        print(f"Table saved to {output_path}")
-    except TimeoutException:
-        print("Timed out waiting for the table to load.")
-    except NoSuchElementException:
-        print("Table element not found on the page.")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+            if set(row) == header_set:
+                continue
 
-def extract_and_save_chart_data(driver: WebDriver, output_file: str):
-    try:
-        rows = driver.find_elements(By.CSS_SELECTOR, "#results-table tbody tr")
-
-        if not rows:
-            print("No rows found for chart data extraction.")
-            return
-        aggregation = {}
-        for row in rows:
-            cols = row.find_elements(By.XPATH, ".//td")
-            if len(cols) >= 3:
-                result = cols[0].text.strip()
-                duration_text = cols[2].text.strip()
-                
-                duration = int(duration_text.replace("ms", "").strip())
-                if result not in aggregation:
-                    aggregation[result] = []
-                aggregation[result].append(duration)
-
-        final_data = [[key,min(values)] for key, values in aggregation.items()]
-
-        with open(output_file, mode="w", newline="", encoding="utf-8") as f:
+            clean_rows.append(row)
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["Result", "Min Duration (ms)"])
-            writer.writerows(final_data)
-        print(f"Chart data saved to {output_file}")
-    except Exception as e:
-        print(f"Data extracting failed: {e}")
+            writer.writerow(headers)
+            writer.writerows(clean_rows)
 
+        print(f"Table successfully extracted to {output_path}")
+
+    except Exception as e:
+        print(f"FAILED extraction: {type(e).__name__}: {e}")
+        raise
+
+def extract_and_save_chart(driver,index, output_dir):
+    try:
+        slices = driver.find_elements(By.CSS_SELECTOR, "g.slice")
+
+        if not slices:
+            print("No slices found")
+            return
+
+        file_path = os.path.join(output_dir, f"doughnut{index}.csv")
+
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Facility Type", "Min Average Time Spent"])
+
+            for s in slices:
+                tspans = s.find_elements(By.TAG_NAME, "tspan")
+
+                if len(tspans) >= 2:
+                    label = tspans[0].text.strip()
+                    value = tspans[1].text.strip()
+
+                    writer.writerow([label, value])
+
+        print(f"{file_path} created")
+
+    except Exception as e:
+        print(f"Chart extraction failed: {e}")
 
 
 def process_doughnut_chart(driver: WebDriver, output_dir: str):
@@ -108,44 +136,16 @@ def process_doughnut_chart(driver: WebDriver, output_dir: str):
     wait = WebDriverWait(driver, 10)
 
     try:
-        filters = driver.find_elements(By.CSS_SELECTOR, "input.filter")
+       chart = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "g.pielayer")))
+       driver.execute_script("arguments[0].scrollIntoView(true);", chart)
+       chart_path = os.path.join(output_dir, "screenshot0.png")
+       chart.screenshot(chart_path)
 
-        if not filters:
-            print("No filters found on the page.")
-            return
-        active_filters = [f for f in filters if f.is_enabled()]
-        print(f"Found {len(active_filters)} active filters.")
+       extract_and_save_chart(driver,0, output_dir)
+       print(f"Doughnut chart screenshot saved to {chart_path}")
 
-        screenshot_index = 0
-        csv_index = 0
-
-        take_element_screenshot(driver, (By.ID, "results-table"), f"{output_dir}/screenshot{screenshot_index}.png")
-        screenshot_index += 1
-        take_element_screenshot(driver,(By.CLASS_NAME,"summary"),f"{output_dir}/screenshot{screenshot_index}.png")
-        screenshot_index += 1
-        take_element_screenshot(driver,(By.CLASS_NAME,"filters"),f"{output_dir}/screenshot{screenshot_index}.png")
-        screenshot_index += 1
-
-        extract_and_save_chart_data(driver, f"{output_dir}/doughnut{csv_index}.csv")
-        csv_index += 1
-
-
-        for checkbox in active_filters:
-            try:
-                driver.execute_script("arguments[0].click();", checkbox)
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#results-table tbody"))
-                           )
-                take_element_screenshot(driver, (By.ID, "results-table"), f"{output_dir}/screenshot{screenshot_index}.png")
-                screenshot_index += 1
-
-                extract_and_save_chart_data(driver, f"{output_dir}/doughnut{csv_index}.csv")
-                csv_index += 1
-            except Exception as e:
-                print(f"Filter click failed: {e}")
-        print("Done.")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-
+        print(f"An error occurred while processing the doughnut chart: {e}")
 
 if __name__ == "__main__":
     with SeleniumWebDriverContextManager() as driver:

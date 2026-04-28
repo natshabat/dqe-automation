@@ -1,17 +1,20 @@
-Result,Test,Duration,Links
-Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_dataset_is_not_empty,345 ms,
-"<
->
-No log output captured."
-Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_check_count,81 ms,
-"<
->
-No log output captured."
-Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_check_not_null_values,1 ms,
-"<
->
-No log output captured."
-Passed,dq checks/parquet_files/test_facility_name_min_time_spent_per_visit_date.py::test_check_duplicates,2 ms,
-"<
->
-No log output captured."
+Facility Type,Visit Date,Average Time Spent
+Specialty Center,2026-03-21,50
+Hospital,2026-03-21,25.5
+Clinic,2026-03-21,32
+Specialty Center,2026-03-20,28.5
+Hospital,2026-03-20,32.5
+Clinic,2026-03-20,49
+Specialty Center,2026-03-19,42.4
+Hospital,2026-03-19,43
+Specialty Center,2026-03-18,45
+Hospital,2026-03-18,38.6
+Clinic,2026-03-18,29.33
+Specialty Center,2026-03-17,57.5
+Hospital,2026-03-17,35.33
+Clinic,2026-03-17,19
+Specialty Center,2026-03-16,37.33
+Clinic,2026-03-16,52
+Specialty Center,2026-03-15,25.5
+Hospital,2026-03-15,30.5
+Clinic,2026-03-15,37
