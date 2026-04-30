@@ -1,5 +1,7 @@
 import os
 import csv
+import time
+
 
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
@@ -9,14 +11,19 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-def take_element_screenshot(driver, locator,path):
+def take_element_screenshot(driver, locator, path):
     wait = WebDriverWait(driver, 10)
 
-    element = wait.until(EC.visibility_of_element_located(locator))
-
-    driver.execute_script("arguments[0].scrollIntoView(true);", element)
-
+    element = wait.until(
+        EC.visibility_of_element_located(locator)
+    )
+    driver.execute_script(
+        "arguments[0].scrollIntoView(true);",
+        element
+    )
+    time.sleep(1)
     element.screenshot(path)
+    print(f"Screenshot created: {path}")
 
     
 
@@ -56,11 +63,7 @@ def extract_table(driver: WebDriver, output_path: str):
             "g.y-column g#header text.cell-text"
         )
         headers = [h.text.strip() for h in header_elements]
-
-        # 4. get all columns
         columns = driver.find_elements(By.CSS_SELECTOR, "g.y-column")
-
-        # 5. build column data matrix first
         column_matrix = []
 
         for col in columns:
@@ -101,51 +104,235 @@ def extract_table(driver: WebDriver, output_path: str):
         print(f"FAILED extraction: {type(e).__name__}: {e}")
         raise
 
-def extract_and_save_chart(driver,index, output_dir):
+
+def wait_for_donut_chart(driver):
+
+    wait = WebDriverWait(driver, 15)
+
+    wait.until(
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, "g.pielayer")
+        )
+    )
+
+    wait.until(
+        lambda d: len(
+            d.find_elements(
+                By.CSS_SELECTOR,
+                'g.pielayer text.slicetext[data-notex="1"]'
+            )
+        ) > 0
+    )
+    time.sleep(1)
+
+def get_legend_items(driver):
+    """
+    Returns all legend labels + toggle buttons.
+    """
+    legends = []
+
+    traces = driver.find_elements(
+        By.CSS_SELECTOR,
+        "g.legend g.traces"
+    )
+
+    for trace in traces:
+
+        try:
+
+            label = trace.find_element(
+                By.TAG_NAME,
+                "text"
+            ).text.strip()
+
+            toggle = trace.find_element(
+                By.CSS_SELECTOR,
+                "rect.legendtoggle"
+            )
+
+            legends.append({
+                "label": label,
+                "toggle": toggle
+            })
+
+        except Exception:
+            continue
+
+    return legends
+
+
+def click_legend(driver, element):
+    """
+    Plotly-safe SVG click.
+    """
+
+    driver.execute_script(
+        "arguments[0].scrollIntoView(true);",
+        element
+    )
+
+    time.sleep(0.5)
+
+    driver.execute_script("""
+        arguments[0].dispatchEvent(
+            new MouseEvent('mousedown', { bubbles: true })
+        );
+
+        arguments[0].dispatchEvent(
+            new MouseEvent('mouseup', { bubbles: true })
+        );
+
+        arguments[0].dispatchEvent(
+            new MouseEvent('click', { bubbles: true })
+        );
+    """, element)
+
+    time.sleep(1)
+
+
+def extract_donut_data(driver):
+    """
+    Extract visible doughnut labels and values.
+    """
+
+    data = []
+
     try:
-        slices = driver.find_elements(By.CSS_SELECTOR, "g.slice")
 
-        if not slices:
-            print("No slices found")
-            return
+        labels = driver.find_elements(
+            By.CSS_SELECTOR,
+            'g.pielayer text.slicetext[data-notex="1"]'
+        )
 
-        file_path = os.path.join(output_dir, f"doughnut{index}.csv")
+        for label in labels:
 
-        with open(file_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Facility Type", "Min Average Time Spent"])
+            tspans = label.find_elements(
+                By.TAG_NAME,
+                "tspan"
+            )
 
-            for s in slices:
-                tspans = s.find_elements(By.TAG_NAME, "tspan")
+            if len(tspans) >= 2:
 
-                if len(tspans) >= 2:
-                    label = tspans[0].text.strip()
-                    value = tspans[1].text.strip()
+                facility_type = tspans[0].text.strip()
+                value = tspans[1].text.strip()
 
-                    writer.writerow([label, value])
-
-        print(f"{file_path} created")
+                data.append([
+                    facility_type,
+                    value
+                ])
 
     except Exception as e:
-        print(f"Chart extraction failed: {e}")
+
+        print(f"Data extraction failed: {e}")
+
+    return data
 
 
-def process_doughnut_chart(driver: WebDriver, output_dir: str):
+def save_donut_csv(data, index, output_dir):
+
+    path = os.path.join(
+        output_dir,
+        f"doughnut{index}.csv"
+    )
+
+    with open(path, "w", newline="", encoding="utf-8") as f:
+
+        writer = csv.writer(f)
+
+        writer.writerow([
+            "Facility Type",
+            "Min Average Time Spent"
+        ])
+
+        writer.writerows(data)
+
+    print(f"CSV created: {path}")
+
+
+def set_active_filters(driver, active_labels):
+    """
+    Set chart state to match desired active labels.
+    """
+
+    legends = get_legend_items(driver)
+    for legend in legends:
+        try:
+            click_legend(driver, legend["toggle"])
+        except Exception as e:
+            print(f"Error clicking legend '{legend['label']}': {e}")
+    time.sleep(1.5)
+
+    for legend in legends:
+        if legend["label"] in active_labels:
+            try:
+                click_legend(driver, legend["toggle"])
+            except Exception as e:
+                print(f"Error clicking legend '{legend['label']}': {e}")
+    time.sleep(1.5)
+
+def apply_filters_from_clean_state(driver, active_labels):
+
+    legends = get_legend_items(driver)
+
+    for legend in legends:
+        label = legend["label"]
+
+        if label in active_labels:
+            try:
+                click_legend(driver, legend["toggle"])
+            except Exception as e:
+                print(f"Error clicking legend '{label}': {e}")
+    time.sleep(1.5)
+
+def process_doughnut_chart(driver, output_dir):
+
     os.makedirs(output_dir, exist_ok=True)
 
-    wait = WebDriverWait(driver, 10)
+    #wait_for_donut_chart(driver)
 
-    try:
-       chart = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "g.pielayer")))
-       driver.execute_script("arguments[0].scrollIntoView(true);", chart)
-       chart_path = os.path.join(output_dir, "screenshot0.png")
-       chart.screenshot(chart_path)
+    scenarios = [
+        ["Hospital", "Specialty Center", "Clinic"],
+        ["Hospital", "Clinic"],
+        ["Clinic"],
+        []
+    ]
 
-       extract_and_save_chart(driver,0, output_dir)
-       print(f"Doughnut chart screenshot saved to {chart_path}")
+    for index, active_labels in enumerate(scenarios):
 
-    except Exception as e:
-        print(f"An error occurred while processing the doughnut chart: {e}")
+        print("\n====================")
+        print(f"Scenario {index}")
+        print(f"Active filters: {active_labels}")
+
+        try:
+            driver.refresh()
+            wait_for_donut_chart(driver)
+
+            apply_filters_from_clean_state(driver, active_labels)
+            time.sleep(2)
+
+            screenshot_path = os.path.join(
+                output_dir,
+                f"screenshot{index}.png"
+            )
+
+            take_element_screenshot(
+                driver,
+                (By.CSS_SELECTOR, ".js-plotly-plot"),
+                screenshot_path
+            )
+
+            data = extract_donut_data(driver)
+
+            save_donut_csv(
+                data,
+                index,
+                output_dir
+            )
+
+        except Exception as e:
+
+            print(f"Scenario {index} failed: {e}")
+    print("\nDoughnut chart scenarios completed")
 
 if __name__ == "__main__":
     with SeleniumWebDriverContextManager() as driver:
